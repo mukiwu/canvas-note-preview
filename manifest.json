@@ -1,0 +1,10 @@
+{
+	"id": "canvas-note-preview",
+	"name": "Canvas Note Preview",
+	"version": "1.0.0",
+	"minAppVersion": "1.4.0",
+	"description": "Preview notes in sidebar when clicking canvas nodes, similar to Heptabase",
+	"author": "MUKI",
+	"authorUrl": "https://github.com/mukiwu",
+	"isDesktopOnly": false
+}
