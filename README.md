@@ -13,7 +13,9 @@ A Heptabase-like note preview feature for Obsidian Canvas. When you click on a n
 
 ## 📸 Demo
 
-[Add a GIF or screenshot here showing the plugin in action]
+https://github.com/user-attachments/assets/demo.mp4
+
+*Click on any note in Canvas to instantly preview its content in the sidebar*
 
 ## 🚀 Usage
 
