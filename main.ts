@@ -8,10 +8,8 @@ interface CanvasNode {
 	type?: string;
 }
 
-interface CanvasSelection extends Set<CanvasNode> {}
-
 interface Canvas {
-	selection: CanvasSelection;
+	selection: Set<CanvasNode>;
 }
 
 interface CanvasView extends ItemView {
@@ -39,13 +37,15 @@ class NotePreviewView extends ItemView {
 		return "document";
 	}
 
-	async onOpen() {
+	onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
 		container.addClass('canvas-note-preview-container');
 
 		const emptyState = container.createDiv({ cls: 'canvas-note-preview-empty' });
 		emptyState.setText('Click a note in canvas to preview');
+
+		return Promise.resolve();
 	}
 
 	async setFile(file: TFile | null) {
@@ -154,7 +154,7 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 
 		if (leaf) {
 			this.previewLeaf = leaf;
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 
