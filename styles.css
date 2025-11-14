@@ -1,0 +1,78 @@
+.canvas-note-preview-container {
+	padding: 20px;
+	height: 100%;
+	overflow-y: auto;
+}
+
+.canvas-note-preview-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
+.canvas-note-preview-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 20px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.canvas-note-preview-header h3 {
+	margin: 0;
+	font-size: 18px;
+}
+
+.canvas-note-preview-open-btn {
+	padding: 4px 12px;
+	font-size: 12px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.canvas-note-preview-open-btn:hover {
+	background: var(--interactive-accent-hover);
+}
+
+.canvas-note-preview-content {
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.canvas-note-preview-content h1,
+.canvas-note-preview-content h2,
+.canvas-note-preview-content h3 {
+	margin-top: 1.5em;
+	margin-bottom: 0.5em;
+}
+
+.canvas-note-preview-content p {
+	margin-bottom: 1em;
+}
+
+.canvas-note-preview-content ul,
+.canvas-note-preview-content ol {
+	margin-left: 1.5em;
+	margin-bottom: 1em;
+}
+
+.canvas-note-preview-content code {
+	background: var(--code-background);
+	padding: 2px 4px;
+	border-radius: 3px;
+	font-family: var(--font-monospace);
+}
+
+.canvas-note-preview-content pre {
+	background: var(--code-background);
+	padding: 10px;
+	border-radius: 5px;
+	overflow-x: auto;
+}
