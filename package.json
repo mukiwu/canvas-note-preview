@@ -1,6 +1,6 @@
 {
   "name": "canvas-note-preview",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Preview notes in sidebar when clicking canvas nodes",
   "main": "main.js",
   "scripts": {

@@ -20,6 +20,13 @@ interface CanvasView extends ItemView {
 // 側邊欄預覽視圖
 class NotePreviewView extends ItemView {
 	currentFile: TFile | null = null;
+	private isEditMode = false;
+	private previewContainer: HTMLElement | null = null;
+	private editorContainer: HTMLElement | null = null;
+	private editor: HTMLTextAreaElement | null = null;
+	private saveTimeout: number | null = null;
+	private saveStatusEl: HTMLElement | null = null;
+	private toggleBtn: HTMLButtonElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -56,6 +63,7 @@ class NotePreviewView extends ItemView {
 		if (!file) {
 			const emptyState = container.createDiv({ cls: 'canvas-note-preview-empty' });
 			emptyState.setText('Click a note in canvas to preview');
+			this.isEditMode = false;
 			return;
 		}
 
@@ -63,36 +71,191 @@ class NotePreviewView extends ItemView {
 		const header = container.createDiv({ cls: 'canvas-note-preview-header' });
 		header.createEl('h3', { text: file.basename });
 
+		// 建立按鈕容器
+		const buttonContainer = header.createDiv({ cls: 'canvas-note-preview-buttons' });
+
+		// 建立切換編輯/預覽按鈕
+		this.toggleBtn = buttonContainer.createEl('button', { text: 'Edit' });
+		this.toggleBtn.addClass('canvas-note-preview-toggle-btn');
+		this.toggleBtn.onclick = () => {
+			void this.toggleEditMode();
+		};
+
 		// 建立開啟按鈕
-		const openButton = header.createEl('button', { text: 'Open' });
+		const openButton = buttonContainer.createEl('button', { text: 'Open' });
 		openButton.addClass('canvas-note-preview-open-btn');
 		openButton.onclick = () => {
 			void this.app.workspace.getLeaf(false).openFile(file);
 		};
 
-		// 建立內容區
-		const content = container.createDiv({ cls: 'canvas-note-preview-content' });
+		// 建立儲存狀態指示器
+		this.saveStatusEl = header.createDiv({ cls: 'canvas-note-preview-save-status' });
+		this.updateSaveStatus('saved');
 
+		// 建立預覽容器
+		this.previewContainer = container.createDiv({ cls: 'canvas-note-preview-content' });
+
+		// 建立編輯器容器
+		this.editorContainer = container.createDiv({ cls: 'canvas-note-preview-editor' });
+		this.editor = this.editorContainer.createEl('textarea', {
+			cls: 'canvas-note-preview-textarea'
+		});
+
+		// 設置編輯器事件
+		this.editor.addEventListener('input', () => {
+			this.scheduleAutoSave();
+		});
+
+		// 讀取檔案內容
 		try {
 			const fileContent = await this.app.vault.read(file);
 
-			// 使用 MarkdownRenderer.render 而不是 renderMarkdown
-			// 這個方法會正確處理內部連結、圖片嵌入等
+			// 更新編輯器內容
+			this.editor.value = fileContent;
+
+			// 渲染預覽
 			await MarkdownRenderer.render(
 				this.app,
 				fileContent,
-				content,
+				this.previewContainer,
 				file.path,
 				this
 			);
+
+			// 預設顯示預覽模式
+			this.showPreview();
 		} catch (error) {
-			content.setText('Failed to load note content');
+			if (this.previewContainer) {
+				this.previewContainer.setText('Failed to load note content');
+			}
 			console.error('Error loading note:', error);
 		}
 	}
 
+	async toggleEditMode() {
+		this.isEditMode = !this.isEditMode;
+
+		if (this.isEditMode) {
+			this.showEditor();
+		} else {
+			await this.saveAndShowPreview();
+		}
+	}
+
+	showEditor() {
+		if (!this.previewContainer || !this.editorContainer || !this.editor || !this.toggleBtn) {
+			return;
+		}
+
+		this.previewContainer.style.display = 'none';
+		this.editorContainer.style.display = 'block';
+		this.toggleBtn.setText('Preview');
+		this.editor.focus();
+	}
+
+	showPreview() {
+		if (!this.previewContainer || !this.editorContainer || !this.toggleBtn) {
+			return;
+		}
+
+		this.editorContainer.style.display = 'none';
+		this.previewContainer.style.display = 'block';
+		this.toggleBtn.setText('Edit');
+	}
+
+	async saveAndShowPreview() {
+		await this.saveContent();
+		await this.refreshPreview();
+		this.showPreview();
+	}
+
+	scheduleAutoSave() {
+		this.updateSaveStatus('unsaved');
+
+		if (this.saveTimeout) {
+			window.clearTimeout(this.saveTimeout);
+		}
+
+		this.saveTimeout = window.setTimeout(() => {
+			void this.saveContent();
+		}, 2000);
+	}
+
+	async saveContent() {
+		if (!this.currentFile || !this.editor) {
+			return;
+		}
+
+		this.updateSaveStatus('saving');
+
+		try {
+			const newContent = this.editor.value;
+			await this.app.vault.modify(this.currentFile, newContent);
+			this.updateSaveStatus('saved');
+		} catch (error) {
+			console.error('Error saving file:', error);
+			this.updateSaveStatus('error');
+		}
+	}
+
+	async refreshPreview() {
+		if (!this.previewContainer || !this.currentFile || !this.editor) {
+			return;
+		}
+
+		this.previewContainer.empty();
+
+		try {
+			await MarkdownRenderer.render(
+				this.app,
+				this.editor.value,
+				this.previewContainer,
+				this.currentFile.path,
+				this
+			);
+		} catch (error) {
+			console.error('Error rendering preview:', error);
+			this.previewContainer.setText('Failed to render preview');
+		}
+	}
+
+	updateSaveStatus(status: 'saved' | 'saving' | 'unsaved' | 'error') {
+		if (!this.saveStatusEl) {
+			return;
+		}
+
+		this.saveStatusEl.removeClass('save-status-saved', 'save-status-saving', 'save-status-unsaved', 'save-status-error');
+
+		switch (status) {
+			case 'saved':
+				this.saveStatusEl.setText('Saved');
+				this.saveStatusEl.addClass('save-status-saved');
+				break;
+			case 'saving':
+				this.saveStatusEl.setText('Saving...');
+				this.saveStatusEl.addClass('save-status-saving');
+				break;
+			case 'unsaved':
+				this.saveStatusEl.setText('Unsaved changes');
+				this.saveStatusEl.addClass('save-status-unsaved');
+				break;
+			case 'error':
+				this.saveStatusEl.setText('Save failed');
+				this.saveStatusEl.addClass('save-status-error');
+				break;
+		}
+	}
+
 	async onClose() {
-		// Cleanup
+		// 清除定時器
+		if (this.saveTimeout) {
+			window.clearTimeout(this.saveTimeout);
+		}
+
+		// 如果在編輯模式且有未儲存的變更，先儲存
+		if (this.isEditMode && this.currentFile && this.editor) {
+			await this.saveContent();
+		}
 	}
 }
 
