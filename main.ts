@@ -103,8 +103,16 @@ class NotePreviewView extends ItemView {
 
 		// 建立編輯器容器
 		this.editorContainer = container.createDiv({ cls: 'canvas-note-preview-editor' });
+
+		// 防止其他插件干擾我們的編輯器
+		this.editorContainer.addEventListener('click', (e) => e.stopPropagation());
+		this.editorContainer.addEventListener('focus', (e) => e.stopPropagation(), true);
+
 		this.editor = this.editorContainer.createEl('textarea', {
-			cls: 'canvas-note-preview-textarea'
+			cls: 'canvas-note-preview-textarea',
+			attr: {
+				'spellcheck': 'false'
+			}
 		});
 
 		// 設置編輯器事件
