@@ -58,6 +58,12 @@ class NotePreviewView extends ItemView {
 	async setFile(file: TFile | null) {
 		this.currentFile = file;
 		const container = this.containerEl.children[1];
+
+		if (!container) {
+			console.error('Container not found');
+			return;
+		}
+
 		container.empty();
 
 		if (!file) {
@@ -69,7 +75,7 @@ class NotePreviewView extends ItemView {
 
 		// 建立標題區
 		const header = container.createDiv({ cls: 'canvas-note-preview-header' });
-		header.createEl('h3', { text: file.basename });
+		header.createEl('h3', { text: file?.basename || 'Untitled' });
 
 		// 建立按鈕容器
 		const buttonContainer = header.createDiv({ cls: 'canvas-note-preview-buttons' });
