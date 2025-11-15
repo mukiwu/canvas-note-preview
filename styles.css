@@ -62,8 +62,8 @@
 }
 
 .save-status-saved {
-	color: var(--text-success);
-	background: var(--background-modifier-success);
+	color: var(--color-green);
+	background: rgba(var(--color-green-rgb), 0.15);
 }
 
 .save-status-saving {
