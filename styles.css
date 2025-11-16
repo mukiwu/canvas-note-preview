@@ -119,9 +119,16 @@
 
 /* 編輯器樣式 */
 .canvas-note-preview-editor {
-	display: none;
 	height: calc(100vh - 200px);
 	min-height: 400px;
+}
+
+.canvas-note-preview-editor.is-hidden {
+	display: none;
+}
+
+.canvas-note-preview-content.is-hidden {
+	display: none;
 }
 
 .canvas-note-preview-textarea {

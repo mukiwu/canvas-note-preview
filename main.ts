@@ -101,8 +101,8 @@ class NotePreviewView extends ItemView {
 		// 建立預覽容器
 		this.previewContainer = container.createDiv({ cls: 'canvas-note-preview-content' });
 
-		// 建立編輯器容器
-		this.editorContainer = container.createDiv({ cls: 'canvas-note-preview-editor' });
+		// 建立編輯器容器（預設隱藏）
+		this.editorContainer = container.createDiv({ cls: 'canvas-note-preview-editor is-hidden' });
 
 		// 防止其他插件干擾我們的編輯器
 		this.editorContainer.addEventListener('click', (e) => e.stopPropagation());
@@ -161,8 +161,8 @@ class NotePreviewView extends ItemView {
 			return;
 		}
 
-		this.previewContainer.style.display = 'none';
-		this.editorContainer.style.display = 'block';
+		this.previewContainer.addClass('is-hidden');
+		this.editorContainer.removeClass('is-hidden');
 		this.toggleBtn.setText('Preview');
 		this.editor.focus();
 	}
@@ -172,8 +172,8 @@ class NotePreviewView extends ItemView {
 			return;
 		}
 
-		this.editorContainer.style.display = 'none';
-		this.previewContainer.style.display = 'block';
+		this.editorContainer.addClass('is-hidden');
+		this.previewContainer.removeClass('is-hidden');
 		this.toggleBtn.setText('Edit');
 	}
 
