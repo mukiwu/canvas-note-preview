@@ -144,13 +144,17 @@ class NotePreviewView extends ItemView {
 			this.editor.value = fileContent;
 
 			// 渲染預覽
-			await MarkdownRenderer.render(
-				this.app,
-				fileContent,
-				this.previewContainer,
-				file.path,
-				this
-			);
+			if (file.extension === 'canvas') {
+				this.renderCanvasPreview(fileContent, this.previewContainer);
+			} else {
+				await MarkdownRenderer.render(
+					this.app,
+					fileContent,
+					this.previewContainer,
+					file.path,
+					this
+				);
+			}
 			this.attachLinkHandler(this.previewContainer);
 
 			// 預設顯示預覽模式
@@ -283,6 +287,49 @@ class NotePreviewView extends ItemView {
 	 * Handles both external file:/// links (opens in system file explorer)
 	 * and internal vault links (navigates within the preview panel).
 	 */
+	private renderCanvasPreview(jsonContent: string, container: HTMLElement) {
+		try {
+			const data = JSON.parse(jsonContent);
+			const nodes: Array<{type?: string; label?: string; file?: string; text?: string}> = data.nodes || [];
+			const groups = nodes.filter(n => n.type === 'group');
+			const fileNodes = nodes.filter(n => n.type === 'file');
+			const textNodes = nodes.filter(n => n.type === 'text');
+			const edges: unknown[] = data.edges || [];
+
+			let md = '**Double click the card to open this canvas**\n\n';
+			md += `${nodes.length} nodes \u00B7 ${edges.length} edges\n\n`;
+
+			if (groups.length > 0) {
+				md += '### Groups\n';
+				groups.forEach(g => {
+					md += `- ${g.label || 'Untitled group'}\n`;
+				});
+				md += '\n';
+			}
+
+			if (fileNodes.length > 0) {
+				md += '### Files\n';
+				fileNodes.forEach(f => {
+					const name = f.file ? f.file.split('/').pop() : 'Unknown';
+					md += `- [[${f.file || ''}|${name}]]\n`;
+				});
+				md += '\n';
+			}
+
+			if (textNodes.length > 0) {
+				md += '### Notes\n';
+				textNodes.forEach(t => {
+					const preview = (t.text || '').split('\n')[0].replace(/^#+\s*/, '').substring(0, 60);
+					md += `- ${preview}\n`;
+				});
+			}
+
+			MarkdownRenderer.render(this.app, md, container, '', this);
+		} catch {
+			container.setText('Could not parse canvas file');
+		}
+	}
+
 	private attachLinkHandler(container: HTMLElement) {
 		container.addEventListener('click', (e: MouseEvent) => {
 			const link = (e.target as HTMLElement).closest('a');
