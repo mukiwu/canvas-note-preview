@@ -27,6 +27,8 @@ class NotePreviewView extends ItemView {
 	private saveTimeout: number | null = null;
 	private saveStatusEl: HTMLElement | null = null;
 	private toggleBtn: HTMLButtonElement | null = null;
+	private backBtn: HTMLButtonElement | null = null;
+	private history: TFile[] = [];
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -75,7 +77,21 @@ class NotePreviewView extends ItemView {
 
 		// 建立標題區
 		const header = container.createDiv({ cls: 'canvas-note-preview-header' });
-		header.createEl('h3', { text: file?.basename || 'Untitled' });
+		const titleRow = header.createDiv({ cls: 'canvas-note-preview-title-row' });
+
+		// 建立返回按鈕
+		this.backBtn = titleRow.createEl('button', { text: '\u2190' });
+		this.backBtn.addClass('canvas-note-preview-back-btn');
+		this.backBtn.title = 'Back';
+		if (this.history.length === 0) {
+			this.backBtn.addClass('is-disabled');
+			this.backBtn.disabled = true;
+		}
+		this.backBtn.onclick = () => {
+			void this.goBack();
+		};
+
+		titleRow.createEl('h3', { text: file?.basename || 'Untitled' });
 
 		// 建立按鈕容器
 		const buttonContainer = header.createDiv({ cls: 'canvas-note-preview-buttons' });
@@ -300,11 +316,22 @@ class NotePreviewView extends ItemView {
 						this.currentFile ? this.currentFile.path : ''
 					);
 					if (targetFile) {
+						if (this.currentFile) {
+							this.history.push(this.currentFile);
+						}
 						void this.setFile(targetFile);
 					}
 				}
 			}
 		});
+	}
+
+	private async goBack() {
+		if (this.history.length === 0) return;
+		const prevFile = this.history.pop();
+		if (prevFile) {
+			await this.setFile(prevFile);
+		}
 	}
 
 	async onClose() {
