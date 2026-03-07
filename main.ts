@@ -5,6 +5,8 @@ const VIEW_TYPE_NOTE_PREVIEW = "canvas-note-preview";
 // Canvas 相關的介面定義
 interface CanvasNode {
 	file?: TFile;
+	text?: string;
+	label?: string;
 	type?: string;
 }
 
@@ -373,6 +375,40 @@ class NotePreviewView extends ItemView {
 		});
 	}
 
+	async setTextContent(text: string, label: string) {
+		this.currentFile = null;
+		const container = this.containerEl.children[1];
+
+		if (!container) return;
+
+		container.empty();
+
+		const header = container.createDiv({ cls: 'canvas-note-preview-header' });
+		const titleRow = header.createDiv({ cls: 'canvas-note-preview-title-row' });
+
+		this.backBtn = titleRow.createEl('button', { text: '\u2190' });
+		this.backBtn.addClass('canvas-note-preview-back-btn');
+		this.backBtn.title = 'Back';
+		if (this.history.length === 0) {
+			this.backBtn.addClass('is-disabled');
+			this.backBtn.disabled = true;
+		}
+		this.backBtn.onclick = () => {
+			void this.goBack();
+		};
+
+		titleRow.createEl('h3', { text: label });
+
+		this.previewContainer = container.createDiv({ cls: 'canvas-note-preview-content' });
+
+		try {
+			await MarkdownRenderer.render(this.app, text, this.previewContainer, '', this);
+			this.attachLinkHandler(this.previewContainer);
+		} catch {
+			this.previewContainer.setText('Failed to render text content');
+		}
+	}
+
 	private async goBack() {
 		if (this.history.length === 0) return;
 		const prevFile = this.history.pop();
@@ -481,6 +517,8 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 					// 檢查是否為檔案節點
 					if (node && node.file && node.file instanceof TFile) {
 						void this.showNoteInPreview(node.file);
+					} else if (node && node.text != null && !node.file) {
+						void this.showTextInPreview(node.text, node.label || 'Text node');
 					}
 				}
 			}, 50);
@@ -495,15 +533,24 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 	}
 
 	async showNoteInPreview(file: TFile) {
-		// 如果預覽面板還沒打開，先打開它
 		if (!this.previewLeaf) {
 			await this.activateView();
 		}
 
-		// 更新預覽內容
 		const view = this.previewLeaf?.view;
 		if (view && view instanceof NotePreviewView) {
 			await view.setFile(file);
+		}
+	}
+
+	async showTextInPreview(text: string, label: string) {
+		if (!this.previewLeaf) {
+			await this.activateView();
+		}
+
+		const view = this.previewLeaf?.view;
+		if (view && view instanceof NotePreviewView) {
+			await view.setTextContent(text, label);
 		}
 	}
 }
