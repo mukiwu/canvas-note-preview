@@ -135,6 +135,7 @@ class NotePreviewView extends ItemView {
 				file.path,
 				this
 			);
+			this.attachLinkHandler(this.previewContainer);
 
 			// 預設顯示預覽模式
 			this.showPreview();
@@ -227,6 +228,7 @@ class NotePreviewView extends ItemView {
 				this.currentFile.path,
 				this
 			);
+			this.attachLinkHandler(this.previewContainer);
 		} catch (error) {
 			console.error('Error rendering preview:', error);
 			this.previewContainer.setText('Failed to render preview');
@@ -258,6 +260,51 @@ class NotePreviewView extends ItemView {
 				this.saveStatusEl.addClass('save-status-error');
 				break;
 		}
+	}
+
+	/**
+	 * Attach click handlers to make links interactive in the preview panel.
+	 * Handles both external file:/// links (opens in system file explorer)
+	 * and internal vault links (navigates within the preview panel).
+	 */
+	private attachLinkHandler(container: HTMLElement) {
+		container.addEventListener('click', (e: MouseEvent) => {
+			const link = (e.target as HTMLElement).closest('a');
+			if (!link) return;
+
+			const href = link.getAttribute('href');
+
+			// Handle external file:/// links
+			if (href && href.startsWith('file:///')) {
+				e.preventDefault();
+				e.stopPropagation();
+				const decodedPath = decodeURIComponent(href.replace('file:///', '')).replace(/\//g, '\\');
+				try {
+					// eslint-disable-next-line @typescript-eslint/no-var-requires
+					const { exec } = require('child_process');
+					exec(`explorer.exe "${decodedPath}"`);
+				} catch (err) {
+					console.error('Failed to open external path:', err);
+				}
+				return;
+			}
+
+			// Handle internal vault links
+			if (link.classList.contains('internal-link')) {
+				e.preventDefault();
+				e.stopPropagation();
+				const dataHref = link.getAttribute('data-href') || href;
+				if (dataHref) {
+					const targetFile = this.app.metadataCache.getFirstLinkpathDest(
+						dataHref,
+						this.currentFile ? this.currentFile.path : ''
+					);
+					if (targetFile) {
+						void this.setFile(targetFile);
+					}
+				}
+			}
+		});
 	}
 
 	async onClose() {
