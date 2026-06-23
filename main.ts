@@ -1,4 +1,5 @@
 import { Plugin, WorkspaceLeaf, ItemView, TFile, MarkdownRenderer } from 'obsidian';
+import { isPreviewableFile } from './previewable';
 
 const VIEW_TYPE_NOTE_PREVIEW = "canvas-note-preview";
 
@@ -370,8 +371,8 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 				if (selection && selection.size === 1) {
 					const node = Array.from(selection)[0];
 
-					// 檢查是否為檔案節點
-					if (node && node.file && node.file instanceof TFile) {
+					// 只預覽可安全當文字讀的檔案節點，過濾掉圖片等二進位檔（issue #1）
+					if (node && node.file && node.file instanceof TFile && isPreviewableFile(node.file)) {
 						void this.showNoteInPreview(node.file);
 					}
 				}
