@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, ItemView, TFile, MarkdownRenderer } from 'obsidian';
+import { Plugin, WorkspaceLeaf, ItemView, TFile, MarkdownRenderer, Platform } from 'obsidian';
 import { isPreviewableFile } from './previewable';
 
 const VIEW_TYPE_NOTE_PREVIEW = "canvas-note-preview";
@@ -258,7 +258,8 @@ class NotePreviewView extends ItemView {
 				this.currentFile.path,
 				this
 			);
-			this.attachLinkHandler(this.previewContainer);
+			// The delegated link handler is already attached to this container in
+			// setFile; empty() keeps it, so we must not attach it again here.
 		} catch (error) {
 			console.error('Error rendering preview:', error);
 			this.previewContainer.setText('Failed to render preview');
@@ -293,9 +294,8 @@ class NotePreviewView extends ItemView {
 	}
 
 	/**
-	 * Attach click handlers to make links interactive in the preview panel.
-	 * Handles both external file:/// links (opens in system file explorer)
-	 * and internal vault links (navigates within the preview panel).
+	 * Render a .canvas file as a readable summary (groups, files, notes)
+	 * instead of dumping its raw JSON.
 	 */
 	private renderCanvasPreview(jsonContent: string, container: HTMLElement) {
 		try {
@@ -340,6 +340,11 @@ class NotePreviewView extends ItemView {
 		}
 	}
 
+	/**
+	 * Attach a delegated click handler so links are interactive in the preview.
+	 * External file:/// links open with the OS default app (desktop only);
+	 * internal vault links navigate within the preview panel.
+	 */
 	private attachLinkHandler(container: HTMLElement) {
 		container.addEventListener('click', (e: MouseEvent) => {
 			const link = (e.target as HTMLElement).closest('a');
@@ -347,17 +352,21 @@ class NotePreviewView extends ItemView {
 
 			const href = link.getAttribute('href');
 
-			// Handle external file:/// links
+			// Handle external file:/// links — open with the OS default app.
+			// Desktop only; on mobile there is no Electron/Node, so we skip silently.
 			if (href && href.startsWith('file:///')) {
 				e.preventDefault();
 				e.stopPropagation();
-				const decodedPath = decodeURIComponent(href.replace('file:///', '')).replace(/\//g, '\\');
-				try {
-					// eslint-disable-next-line @typescript-eslint/no-var-requires
-					const { exec } = require('child_process');
-					exec(`explorer.exe "${decodedPath}"`);
-				} catch (err) {
-					console.error('Failed to open external path:', err);
+				if (Platform.isDesktopApp) {
+					try {
+						// eslint-disable-next-line @typescript-eslint/no-var-requires
+						const { shell } = require('electron');
+						// eslint-disable-next-line @typescript-eslint/no-var-requires
+						const { fileURLToPath } = require('url');
+						void shell.openPath(fileURLToPath(href));
+					} catch (err) {
+						console.error('Failed to open external path:', err);
+					}
 				}
 				return;
 			}
@@ -373,10 +382,19 @@ class NotePreviewView extends ItemView {
 						this.currentFile ? this.currentFile.path : ''
 					);
 					if (targetFile) {
-						if (this.currentFile) {
-							this.history.push(this.currentFile);
+						if (isPreviewableFile(targetFile)) {
+							if (this.currentFile) {
+								this.history.push(this.currentFile);
+							}
+							void this.setFile(targetFile);
+						} else {
+							// Image/PDF/etc.: opening it as text would crash (issue #1),
+							// so hand off to Obsidian's normal link opening instead.
+							void this.app.workspace.openLinkText(
+								dataHref,
+								this.currentFile ? this.currentFile.path : ''
+							);
 						}
-						void this.setFile(targetFile);
 					}
 				}
 			}
