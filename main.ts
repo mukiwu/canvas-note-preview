@@ -55,12 +55,17 @@ class NotePreviewView extends ItemView {
 		return Promise.resolve();
 	}
 
+	private _rendering = false;
+
 	async setFile(file: TFile | null) {
+		if (this._rendering) return;
+		this._rendering = true;
 		this.currentFile = file;
 		const container = this.containerEl.children[1];
 
 		if (!container) {
 			console.error('Container not found');
+			this._rendering = false;
 			return;
 		}
 
@@ -143,6 +148,8 @@ class NotePreviewView extends ItemView {
 				this.previewContainer.setText('Failed to load note content');
 			}
 			console.error('Error loading note:', error);
+		} finally {
+			this._rendering = false;
 		}
 	}
 
@@ -335,19 +342,25 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 		}
 	}
 
+	private _canvasListenersSet = new WeakSet<HTMLElement>();
+
 	setupCanvasListeners(leaf: WorkspaceLeaf) {
 		const canvasView = leaf.view as CanvasView;
 
 		if (!canvasView.canvas) {
-			// Canvas 還沒準備好，稍後再試
 			setTimeout(() => this.setupCanvasListeners(leaf), 100);
 			return;
 		}
 
-		const canvas = canvasView.canvas;
-
-		// 使用 DOM 事件監聽點擊，而不是 canvas.on
 		const canvasEl = canvasView.containerEl;
+
+		// Prevent attaching duplicate click handlers to the same canvas element
+		if (this._canvasListenersSet.has(canvasEl)) {
+			return;
+		}
+		this._canvasListenersSet.add(canvasEl);
+
+		const canvas = canvasView.canvas;
 
 		const handleClick = (event: MouseEvent) => {
 			// 等待一小段時間讓 Canvas 更新選擇狀態
@@ -367,9 +380,9 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 
 		canvasEl.addEventListener('click', handleClick);
 
-		// 記錄清理函數
 		this.register(() => {
 			canvasEl.removeEventListener('click', handleClick);
+			this._canvasListenersSet.delete(canvasEl);
 		});
 	}
 
