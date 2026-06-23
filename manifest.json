@@ -1,7 +1,7 @@
 {
 	"id": "canvas-note-preview",
 	"name": "Canvas Note Preview",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"minAppVersion": "1.4.0",
 	"description": "Preview and edit notes in sidebar when clicking canvas nodes, similar to Heptabase.",
 	"author": "MUKI",
