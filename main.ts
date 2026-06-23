@@ -6,6 +6,8 @@ const VIEW_TYPE_NOTE_PREVIEW = "canvas-note-preview";
 // Canvas 相關的介面定義
 interface CanvasNode {
 	file?: TFile;
+	text?: string;
+	label?: string;
 	type?: string;
 }
 
@@ -28,6 +30,8 @@ class NotePreviewView extends ItemView {
 	private saveTimeout: number | null = null;
 	private saveStatusEl: HTMLElement | null = null;
 	private toggleBtn: HTMLButtonElement | null = null;
+	private backBtn: HTMLButtonElement | null = null;
+	private history: TFile[] = [];
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -81,7 +85,21 @@ class NotePreviewView extends ItemView {
 
 		// 建立標題區
 		const header = container.createDiv({ cls: 'canvas-note-preview-header' });
-		header.createEl('h3', { text: file?.basename || 'Untitled' });
+		const titleRow = header.createDiv({ cls: 'canvas-note-preview-title-row' });
+
+		// 建立返回按鈕
+		this.backBtn = titleRow.createEl('button', { text: '\u2190' });
+		this.backBtn.addClass('canvas-note-preview-back-btn');
+		this.backBtn.title = 'Back';
+		if (this.history.length === 0) {
+			this.backBtn.addClass('is-disabled');
+			this.backBtn.disabled = true;
+		}
+		this.backBtn.onclick = () => {
+			void this.goBack();
+		};
+
+		titleRow.createEl('h3', { text: file?.basename || 'Untitled' });
 
 		// 建立按鈕容器
 		const buttonContainer = header.createDiv({ cls: 'canvas-note-preview-buttons' });
@@ -134,13 +152,18 @@ class NotePreviewView extends ItemView {
 			this.editor.value = fileContent;
 
 			// 渲染預覽
-			await MarkdownRenderer.render(
-				this.app,
-				fileContent,
-				this.previewContainer,
-				file.path,
-				this
-			);
+			if (file.extension === 'canvas') {
+				this.renderCanvasPreview(fileContent, this.previewContainer);
+			} else {
+				await MarkdownRenderer.render(
+					this.app,
+					fileContent,
+					this.previewContainer,
+					file.path,
+					this
+				);
+			}
+			this.attachLinkHandler(this.previewContainer);
 
 			// 預設顯示預覽模式
 			this.showPreview();
@@ -235,6 +258,7 @@ class NotePreviewView extends ItemView {
 				this.currentFile.path,
 				this
 			);
+			this.attachLinkHandler(this.previewContainer);
 		} catch (error) {
 			console.error('Error rendering preview:', error);
 			this.previewContainer.setText('Failed to render preview');
@@ -265,6 +289,139 @@ class NotePreviewView extends ItemView {
 				this.saveStatusEl.setText('Save failed');
 				this.saveStatusEl.addClass('save-status-error');
 				break;
+		}
+	}
+
+	/**
+	 * Attach click handlers to make links interactive in the preview panel.
+	 * Handles both external file:/// links (opens in system file explorer)
+	 * and internal vault links (navigates within the preview panel).
+	 */
+	private renderCanvasPreview(jsonContent: string, container: HTMLElement) {
+		try {
+			const data = JSON.parse(jsonContent);
+			const nodes: Array<{type?: string; label?: string; file?: string; text?: string}> = data.nodes || [];
+			const groups = nodes.filter(n => n.type === 'group');
+			const fileNodes = nodes.filter(n => n.type === 'file');
+			const textNodes = nodes.filter(n => n.type === 'text');
+			const edges: unknown[] = data.edges || [];
+
+			let md = '**Double click the card to open this canvas**\n\n';
+			md += `${nodes.length} nodes \u00B7 ${edges.length} edges\n\n`;
+
+			if (groups.length > 0) {
+				md += '### Groups\n';
+				groups.forEach(g => {
+					md += `- ${g.label || 'Untitled group'}\n`;
+				});
+				md += '\n';
+			}
+
+			if (fileNodes.length > 0) {
+				md += '### Files\n';
+				fileNodes.forEach(f => {
+					const name = f.file ? f.file.split('/').pop() : 'Unknown';
+					md += `- [[${f.file || ''}|${name}]]\n`;
+				});
+				md += '\n';
+			}
+
+			if (textNodes.length > 0) {
+				md += '### Notes\n';
+				textNodes.forEach(t => {
+					const preview = (t.text || '').split('\n')[0].replace(/^#+\s*/, '').substring(0, 60);
+					md += `- ${preview}\n`;
+				});
+			}
+
+			MarkdownRenderer.render(this.app, md, container, '', this);
+		} catch {
+			container.setText('Could not parse canvas file');
+		}
+	}
+
+	private attachLinkHandler(container: HTMLElement) {
+		container.addEventListener('click', (e: MouseEvent) => {
+			const link = (e.target as HTMLElement).closest('a');
+			if (!link) return;
+
+			const href = link.getAttribute('href');
+
+			// Handle external file:/// links
+			if (href && href.startsWith('file:///')) {
+				e.preventDefault();
+				e.stopPropagation();
+				const decodedPath = decodeURIComponent(href.replace('file:///', '')).replace(/\//g, '\\');
+				try {
+					// eslint-disable-next-line @typescript-eslint/no-var-requires
+					const { exec } = require('child_process');
+					exec(`explorer.exe "${decodedPath}"`);
+				} catch (err) {
+					console.error('Failed to open external path:', err);
+				}
+				return;
+			}
+
+			// Handle internal vault links
+			if (link.classList.contains('internal-link')) {
+				e.preventDefault();
+				e.stopPropagation();
+				const dataHref = link.getAttribute('data-href') || href;
+				if (dataHref) {
+					const targetFile = this.app.metadataCache.getFirstLinkpathDest(
+						dataHref,
+						this.currentFile ? this.currentFile.path : ''
+					);
+					if (targetFile) {
+						if (this.currentFile) {
+							this.history.push(this.currentFile);
+						}
+						void this.setFile(targetFile);
+					}
+				}
+			}
+		});
+	}
+
+	async setTextContent(text: string, label: string) {
+		this.currentFile = null;
+		const container = this.containerEl.children[1];
+
+		if (!container) return;
+
+		container.empty();
+
+		const header = container.createDiv({ cls: 'canvas-note-preview-header' });
+		const titleRow = header.createDiv({ cls: 'canvas-note-preview-title-row' });
+
+		this.backBtn = titleRow.createEl('button', { text: '\u2190' });
+		this.backBtn.addClass('canvas-note-preview-back-btn');
+		this.backBtn.title = 'Back';
+		if (this.history.length === 0) {
+			this.backBtn.addClass('is-disabled');
+			this.backBtn.disabled = true;
+		}
+		this.backBtn.onclick = () => {
+			void this.goBack();
+		};
+
+		titleRow.createEl('h3', { text: label });
+
+		this.previewContainer = container.createDiv({ cls: 'canvas-note-preview-content' });
+
+		try {
+			await MarkdownRenderer.render(this.app, text, this.previewContainer, '', this);
+			this.attachLinkHandler(this.previewContainer);
+		} catch {
+			this.previewContainer.setText('Failed to render text content');
+		}
+	}
+
+	private async goBack() {
+		if (this.history.length === 0) return;
+		const prevFile = this.history.pop();
+		if (prevFile) {
+			await this.setFile(prevFile);
 		}
 	}
 
@@ -374,6 +531,8 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 					// 只預覽可安全當文字讀的檔案節點，過濾掉圖片等二進位檔（issue #1）
 					if (node && node.file && node.file instanceof TFile && isPreviewableFile(node.file)) {
 						void this.showNoteInPreview(node.file);
+					} else if (node && node.text != null && !node.file) {
+						void this.showTextInPreview(node.text, node.label || 'Text node');
 					}
 				}
 			}, 50);
@@ -388,15 +547,24 @@ export default class CanvasNotePreviewPlugin extends Plugin {
 	}
 
 	async showNoteInPreview(file: TFile) {
-		// 如果預覽面板還沒打開，先打開它
 		if (!this.previewLeaf) {
 			await this.activateView();
 		}
 
-		// 更新預覽內容
 		const view = this.previewLeaf?.view;
 		if (view && view instanceof NotePreviewView) {
 			await view.setFile(file);
+		}
+	}
+
+	async showTextInPreview(text: string, label: string) {
+		if (!this.previewLeaf) {
+			await this.activateView();
+		}
+
+		const view = this.previewLeaf?.view;
+		if (view && view instanceof NotePreviewView) {
+			await view.setTextContent(text, label);
 		}
 	}
 }

@@ -24,6 +24,46 @@
 	gap: 10px;
 }
 
+.canvas-note-preview-title-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 150px;
+}
+
+.canvas-note-preview-title-row h3 {
+	margin: 0;
+	font-size: 18px;
+}
+
+.canvas-note-preview-back-btn {
+	padding: 2px 8px;
+	font-size: 14px;
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background 0.2s;
+	flex-shrink: 0;
+}
+
+.canvas-note-preview-back-btn:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.canvas-note-preview-back-btn.is-disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+.canvas-note-preview-back-btn.is-disabled:hover {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
 .canvas-note-preview-header h3 {
 	margin: 0;
 	font-size: 18px;
